@@ -1,13 +1,13 @@
 import fetch from 'node-fetch';
 import Lastfm from 'simple-lastfm';
-var GetOptions = {method: 'GET',redirect: 'follow'};
-var osu_key = "OSU API V1 KEY";
-var user = "OSU USER ID";
-var lastfm_key = "LASTFM KEY"
-var lastfm_secret = "LASTFM SECRET"
-var lastfm_username = "LASTFM USERNAME"
-var lastfm_password = "LASTFM PASSWORD"
-var lastdate = "0";
+
+const user = "OSU USER ID";
+const lastfm_key = "LASTFM KEY"
+const lastfm_secret = "LASTFM SECRET"
+const lastfm_username = "LASTFM USERNAME"
+const lastfm_password = "LASTFM PASSWORD"
+
+var lastid = "0";
 var lastfm = new Lastfm({
     api_key: lastfm_key,
     api_secret: lastfm_secret,
@@ -19,47 +19,31 @@ lastfm.getSessionKey(function (session_result) {
     console.log("lastfm session established");
     if (session_result.success) {
         setInterval(() => {
-            fetch("https://osu.ppy.sh/api/get_user_recent?k=" + osu_key + "&u=" + user + "&type=id", GetOptions)
+            fetch("https://osu.ppy.sh/users/"+user+"/extra-pages/historical", { method: 'GET', redirect: 'follow' })
                 .then(response => response.text())
                 .then(result => {
-                    if (!JSON.parse(result)[0]) {
+                    var historical = JSON.parse(result)
+                    if (historical.recent.count == 0) {
                         console.log("user has no recent scores")
-                        lastdate = "1";
-                    }
-                    else {
-                        if (lastdate != JSON.parse(result)[0].date && lastdate != "0") {
-                            if (JSON.parse(result)[0].rank != "F") {
-                                fetch("https://osu.ppy.sh/api/get_beatmaps?k=" + osu_key + "&b=" + JSON.parse(result)[0].beatmap_id, GetOptions)
-                                    .then(response2 => response2.text())
-                                    .then(result2 => {
-                                        var artist = !JSON.parse(result2)[0].artist_unicode ? JSON.parse(result2)[0].artist : JSON.parse(result2)[0].artist_unicode;
-                                        var title = !JSON.parse(result2)[0].title_unicode ? JSON.parse(result2)[0].title : JSON.parse(result2)[0].title_unicode;
-                                        console.log("scrobbling: ",artist," - ", title);
-                                        lastfm.scrobbleTrack({
-                                            artist: artist,
-                                            track: title,
-                                            callback: function (result) {
-                                                console.log("successfully scrobbled: ", artist, " - ", title);
-                                            }
-                                        });
-                                    })
-                                    .catch(error2 => console.log('error', error2));
-                            }
-
-                        } else console.log("no new plays");
-                        lastdate = JSON.parse(result)[0].date;
-
+                        lastid = "1";
+                    } else {
+                        if (lastid != historical.recent.items[0].id && lastid != "0") {
+                            let artist = historical.recent.items[0].beatmapset.artist_unicode;
+                            let title = historical.recent.items[0].beatmapset.title_unicode;
+                            lastfm.scrobbleTrack({
+                                artist: artist,
+                                track: title,
+                                callback: function (result) {
+                                    console.log("successfully scrobbled: ", artist, " - ", title);
+                                }
+                            });
+                        }else console.log("no new plays");
+                        lastid = historical.recent.items[0].id;
                     }
                 })
                 .catch(error => console.log('error', error));
-        }, 10000);
+        }, 30000);
     } else {
         console.log("Error: " + session_result.error);
     }
 });
-
-
-
-
-
-
